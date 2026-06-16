@@ -92,7 +92,7 @@ cd C:\Users\selen\Projects\project-practice
 # project-practice 폴더 안에서
 cd backend
 pip install -r requirements.txt
-python -m uvicorn main:app --reload --port 8000
+python -m uvicorn app:app --reload --port 8000
 ```
 
 ### 2) 프론트엔드 실행 (터미널 2)
