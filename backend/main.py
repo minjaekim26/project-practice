@@ -7,9 +7,9 @@ from typing import Annotated
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database import init_db, insert_song, list_songs_with_features
-from .feature_extractor import extract_features
-from .recommendation import recommend_similar
+from database import init_db, insert_song, list_songs_with_features
+from feature_extractor import extract_features
+from recommendation import recommend_similar
 
 
 app = FastAPI(title="Music Recommendation System", version="0.1.0")

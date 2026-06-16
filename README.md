@@ -32,18 +32,88 @@ Windows PowerShell 기준으로 안내합니다.
 
 ## 📥 프로젝트 받기 (GitHub에서 클론)
 
+**처음 받을 때만** 아래를 실행하세요.
+
 ```powershell
 cd C:\Users\selen\Projects
 git clone https://github.com/minjaekim26/project-practice.git
 cd project-practice
 ```
 
+이미 `project-practice` 폴더 안에 있다면 `cd project-practice`를 **다시 하지 마세요.**  
+(그러면 `project-practice\project-practice` 같은 없는 경로로 들어가서 오류가 납니다.)
+
+현재 위치 확인:
+
+```powershell
+Get-Location
+```
+
+`...\project-practice` 가 보이면 이미 프로젝트 루트입니다. 바로 `backend` 또는 `frontend`로 이동하면 됩니다.
+
 이미 클론했다면 최신 코드 받기:
 
 ```powershell
-cd project-practice
+# project-practice 폴더 안에서
 git pull origin main
 ```
+
+---
+
+## 🚀 실행 방법 (가장 쉬운 방법)
+
+프로젝트 루트(`project-practice` 폴더)에서 **터미널 2개**를 엽니다.
+
+**터미널 1 — 백엔드**
+
+```powershell
+cd C:\Users\selen\Projects\project-practice
+.\run-backend.ps1
+```
+
+**터미널 2 — 프론트**
+
+```powershell
+cd C:\Users\selen\Projects\project-practice
+.\run-frontend.ps1
+```
+
+실행 후 브라우저에서 **http://localhost:5173** 접속.
+
+---
+
+## 🚀 실행 방법 (수동)
+
+백엔드와 프론트엔드를 **각각 따로** 실행해야 합니다.
+
+### 1) 백엔드 실행 (터미널 1)
+
+```powershell
+# project-practice 폴더 안에서
+cd backend
+pip install -r requirements.txt
+python -m uvicorn main:app --reload --port 8000
+```
+
+### 2) 프론트엔드 실행 (터미널 2)
+
+```powershell
+# project-practice 폴더 안에서
+cd frontend
+npm install
+npm run dev
+```
+
+정상 실행 시 아래 주소로 접속 가능합니다.
+
+| 용도 | 주소 |
+|------|------|
+| 웹 UI (메인) | http://localhost:5173 |
+| API 상태 확인 | http://localhost:8000/health |
+| API 문서 (Swagger) | http://localhost:8000/docs |
+| 곡 목록 API | http://localhost:8000/songs |
+
+`http://localhost:8000/health` 에 접속했을 때 `{"ok": true}` 가 보이면 백엔드가 켜진 것입니다.
 
 ---
 
@@ -52,53 +122,19 @@ git pull origin main
 ```text
 project-practice/
 ├── backend/                 # FastAPI 서버
-│   ├── main.py              # API 엔드포인트
-│   ├── database.py          # SQLite 저장
-│   ├── feature_extractor.py # librosa 특징 추출
-│   ├── recommendation.py    # 유사도 계산
+│   ├── main.py
+│   ├── database.py
+│   ├── feature_extractor.py
+│   ├── recommendation.py
 │   └── requirements.txt
 ├── frontend/                # React 웹 UI
 │   ├── src/App.jsx
 │   ├── package.json
 │   └── vite.config.js
+├── run-backend.ps1          # 백엔드 실행 스크립트
+├── run-frontend.ps1         # 프론트 실행 스크립트
 └── README.md
 ```
-
----
-
-## 🚀 실행 방법 (2개 터미널 필요)
-
-백엔드와 프론트엔드를 **각각 따로** 실행해야 합니다.
-
-### 1) 백엔드 실행 (터미널 1)
-
-```powershell
-cd backend
-pip install -r requirements.txt
-python -m uvicorn main:app --reload --port 8000
-```
-
-정상 실행 시 아래 주소로 접속 가능합니다.
-
-| 용도 | 주소 |
-|------|------|
-| API 상태 확인 | http://localhost:8000/health |
-| API 문서 (Swagger) | http://localhost:8000/docs |
-| 곡 목록 API | http://localhost:8000/songs |
-
-`http://localhost:8000/health` 에 접속했을 때 `{"ok": true}` 가 보이면 백엔드가 켜진 것입니다.
-
-### 2) 프론트엔드 실행 (터미널 2)
-
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-
-실행 후 터미널에 나오는 주소로 접속합니다. (보통 아래)
-
-👉 **http://localhost:5173**
 
 ---
 
@@ -195,6 +231,7 @@ React UI에 결과 표시
 
 | 증상 | 해결 |
 |------|------|
+| `project-practice\project-practice` 경로 없음 | 이미 프로젝트 안에 있음. `cd backend` 또는 `cd frontend` 사용 |
 | 프론트에서 업로드 실패 | 백엔드가 먼저 켜져 있는지 확인 (`8000` 포트) |
 | `pip` / `python` 인식 안 됨 | Python 설치 후 `python --version` 확인 |
 | `npm` 인식 안 됨 | Node.js 설치 후 `npm --version` 확인 |
