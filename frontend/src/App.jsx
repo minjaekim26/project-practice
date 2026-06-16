@@ -1,3 +1,4 @@
+import axios from "axios";
 import React, { useMemo, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
@@ -12,49 +13,35 @@ function scoreToPercent(score) {
   return Math.round(clamp(p, 0, 1) * 100);
 }
 
-function postRecommendWithProgress({ file, onProgress, signal }) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_BASE}/recommend?top_k=10`);
-    xhr.responseType = "json";
+async function postRecommendWithProgress({ file, onProgress, signal }) {
+  const fd = new FormData();
+  fd.append("file", file);
 
-    xhr.upload.onprogress = (evt) => {
-      if (!evt.lengthComputable) return;
-      const pct = Math.round((evt.loaded / evt.total) * 100);
-      onProgress?.(clamp(pct, 0, 100));
-    };
-
-    xhr.onload = () => {
-      const ok = xhr.status >= 200 && xhr.status < 300;
-      if (!ok) {
-        const detail = xhr.response?.detail || xhr.response || xhr.statusText;
-        reject(new Error(typeof detail === "string" ? detail : JSON.stringify(detail)));
-        return;
-      }
-      resolve(xhr.response);
-    };
-
-    xhr.onerror = () => reject(new Error("Network error"));
-
-    if (signal) {
-      signal.addEventListener(
-        "abort",
-        () => {
-          try {
-            xhr.abort();
-          } catch {
-            // ignore
-          }
-          reject(new Error("Aborted"));
-        },
-        { once: true },
-      );
+  try {
+    const res = await axios.post(`${API_BASE}/recommend?top_k=10`, fd, {
+      signal,
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: (evt) => {
+        const total = evt.total ?? 0;
+        if (!total) return;
+        const pct = Math.round((evt.loaded / total) * 100);
+        onProgress?.(clamp(pct, 0, 100));
+      },
+      timeout: 60_000,
+    });
+    return res.data;
+  } catch (err) {
+    if (axios.isCancel(err)) {
+      throw new Error("취소되었습니다.");
     }
 
-    const fd = new FormData();
-    fd.append("file", file);
-    xhr.send(fd);
-  });
+    const detail =
+      err?.response?.data?.detail ??
+      err?.response?.data ??
+      err?.message ??
+      "요청에 실패했습니다.";
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+  }
 }
 
 export default function App() {
