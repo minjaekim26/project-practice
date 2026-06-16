@@ -21,7 +21,7 @@ import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_db, insert_song, select_all_songs, select_song_by_id
+from database import init_db, insert_song, seed_example_songs, select_all_songs, select_song_by_id
 
 
 # 프로젝트 루트 기준으로 uploads 폴더를 사용합니다.
@@ -108,6 +108,8 @@ def create_app() -> FastAPI:
         # 서버 실행 시 uploads 폴더와 SQLite DB/테이블을 자동 생성합니다.
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         init_db()
+        # DB가 비어있으면 예시 데이터를 추가합니다.
+        seed_example_songs()
 
     @app.get("/health")
     def health() -> dict:
@@ -190,6 +192,117 @@ def create_app() -> FastAPI:
             "title": song_title,
             "artist": song_artist,
             "features": features,
+        }
+
+    def _to_vector(song: dict) -> np.ndarray:
+        """
+        songs 테이블 레코드를 1차원 벡터로 펼칩니다.
+
+        구성(총 1 + 1 + 13 + 12 + 1 + 1 = 29차원):
+        - tempo, duration, mfcc(13), chroma(12), spectral_centroid, zcr
+        """
+        parts: list[float] = []
+        parts.append(float(song["tempo"]))
+        parts.append(float(song["duration"]))
+        parts.extend([float(x) for x in song["mfcc"]])
+        parts.extend([float(x) for x in song["chroma"]])
+        parts.append(float(song["spectral_centroid"]))
+        parts.append(float(song["zcr"]))
+        v = np.array(parts, dtype=np.float32)
+        return np.nan_to_num(v, nan=0.0, posinf=0.0, neginf=0.0)
+
+    def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+        """
+        Cosine Similarity 계산.
+        - 1에 가까울수록 유사, -1에 가까울수록 반대 방향
+        """
+        denom = float(np.linalg.norm(a) * np.linalg.norm(b))
+        if denom == 0.0:
+            return 0.0
+        return float(np.dot(a, b) / denom)
+
+    @app.get("/recommend/{song_id}")
+    def recommend_by_song_id(song_id: int, top_k: int = 10) -> dict:
+        """
+        4) FastAPI API 생성
+
+        DB에 저장된 곡(id)을 기준으로, 다른 곡들과 Cosine Similarity를 계산해 상위 10곡 추천.
+        """
+        songs = select_all_songs()
+        query = next((s for s in songs if s["id"] == song_id), None)
+        if query is None:
+            raise HTTPException(status_code=404, detail="Song not found")
+
+        query_v = _to_vector(query)
+        results = []
+        for s in songs:
+            if s["id"] == song_id:
+                continue
+            score = _cosine_similarity(query_v, _to_vector(s))
+            results.append({"id": s["id"], "title": s["title"], "artist": s["artist"], "score": score})
+
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return {"query_song_id": song_id, "top_k": int(top_k), "recommendations": results[: int(top_k)]}
+
+    @app.post("/recommend")
+    async def recommend_by_upload(
+        file: Annotated[UploadFile, File(...)],
+        top_k: int = 10,
+    ) -> dict:
+        """
+        업로드한 MP3를 기준으로 DB의 곡들과 비교하여 추천합니다.
+
+        - Cosine Similarity 사용
+        - 상위 10곡 추천
+        - 유사도 점수 반환
+        """
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Missing filename")
+
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext != ".mp3":
+            raise HTTPException(status_code=400, detail="Only .mp3 is allowed")
+
+        safe_name = f"{uuid.uuid4().hex}.mp3"
+        save_path = UPLOAD_DIR / safe_name
+
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Empty file")
+        save_path.write_bytes(content)
+
+        try:
+            features = extract_audio_features(save_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Feature extraction failed: {e}")
+
+        # 업로드 파일의 특징을 songs 테이블 스키마에 맞는 임시 dict로 변환
+        query_song = {
+            "tempo": features["tempo_bpm"],
+            "duration": features["duration_sec"],
+            "mfcc": features["mfcc13_mean"],
+            "chroma": features["chroma_mean"],
+            "spectral_centroid": features["spectral_centroid_mean"],
+            "zcr": features["zero_crossing_rate_mean"],
+        }
+        query_v = _to_vector(query_song)
+
+        songs = select_all_songs()
+        if not songs:
+            raise HTTPException(status_code=400, detail="No songs in database to compare")
+
+        results = []
+        for s in songs:
+            score = _cosine_similarity(query_v, _to_vector(s))
+            results.append({"id": s["id"], "title": s["title"], "artist": s["artist"], "score": score})
+
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return {
+            "uploaded_filename": file.filename,
+            "saved_filename": safe_name,
+            "features": features,
+            "top_k": int(top_k),
+            "recommendations": results[: int(top_k)],
         }
 
     return app

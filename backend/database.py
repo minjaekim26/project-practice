@@ -153,3 +153,51 @@ def select_song_by_id(song_id: int, db_path: str | None = None) -> dict[str, Any
         if row is None:
             return None
         return _row_to_dict(row)
+
+
+def seed_example_songs(db_path: str | None = None) -> None:
+    """
+    5) 예시 데이터 포함
+
+    DB가 비어있을 때, 추천 API가 바로 동작하도록 예시 곡 3개를 넣습니다.
+    - 실제 서비스에서는 제거하거나 별도 마이그레이션/시드 스크립트로 관리하세요.
+    """
+    with _connect(db_path) as conn:
+        count = conn.execute("SELECT COUNT(*) AS c FROM songs").fetchone()["c"]
+        if int(count) > 0:
+            return
+
+    # 예시 특징 벡터는 임의 값입니다. (형태만 맞추기)
+    insert_song(
+        title="Example Song A",
+        artist="Example Artist",
+        tempo=120.0,
+        duration=30.0,
+        mfcc=[-200.0 + i for i in range(13)],
+        chroma=[0.10 for _ in range(12)],
+        spectral_centroid=2200.0,
+        zcr=0.05,
+        db_path=db_path,
+    )
+    insert_song(
+        title="Example Song B",
+        artist="Example Artist",
+        tempo=128.0,
+        duration=45.0,
+        mfcc=[-180.0 + i * 0.5 for i in range(13)],
+        chroma=[0.08 for _ in range(12)],
+        spectral_centroid=2600.0,
+        zcr=0.07,
+        db_path=db_path,
+    )
+    insert_song(
+        title="Example Song C",
+        artist="Another Artist",
+        tempo=95.0,
+        duration=60.0,
+        mfcc=[-220.0 + i * 0.2 for i in range(13)],
+        chroma=[0.12 for _ in range(12)],
+        spectral_centroid=1800.0,
+        zcr=0.03,
+        db_path=db_path,
+    )
