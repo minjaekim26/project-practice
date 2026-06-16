@@ -18,8 +18,10 @@ from typing import Annotated
 
 import librosa
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+
+from database import init_db, insert_song, select_all_songs, select_song_by_id
 
 
 # 프로젝트 루트 기준으로 uploads 폴더를 사용합니다.
@@ -103,21 +105,39 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     def _startup() -> None:
-        # 서버 실행 시 uploads 폴더를 자동 생성합니다.
+        # 서버 실행 시 uploads 폴더와 SQLite DB/테이블을 자동 생성합니다.
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        init_db()
 
     @app.get("/health")
     def health() -> dict:
         # 서버 헬스체크 엔드포인트
         return {"ok": True}
 
+    @app.get("/songs")
+    def get_songs() -> dict:
+        """저장된 전체 곡 목록을 JSON으로 반환합니다."""
+        return {"songs": select_all_songs()}
+
+    @app.get("/songs/{song_id}")
+    def get_song(song_id: int) -> dict:
+        """id로 곡 1개를 조회합니다."""
+        song = select_song_by_id(song_id)
+        if song is None:
+            raise HTTPException(status_code=404, detail="Song not found")
+        return song
+
     @app.post("/upload")
-    async def upload_mp3(file: Annotated[UploadFile, File(...)]) -> dict:
+    async def upload_mp3(
+        file: Annotated[UploadFile, File(...)],
+        title: Annotated[str | None, Form()] = None,
+        artist: Annotated[str | None, Form()] = None,
+    ) -> dict:
         """
         MP3 파일 업로드 API.
 
         Swagger(/docs)에서:
-        - Try it out → file 선택 → Execute
+        - Try it out → file 선택 → (선택) title/artist 입력 → Execute
         로 테스트할 수 있습니다.
         """
 
@@ -140,18 +160,35 @@ def create_app() -> FastAPI:
         save_path.write_bytes(content)
 
         # 업로드된 파일을 바로 분석하여 결과를 함께 반환합니다.
-        # (Swagger에서도 한 번에 테스트할 수 있게 하기 위함)
         try:
             features = extract_audio_features(save_path)
         except Exception as e:
-            # 분석 실패 시에도 파일은 저장되어 있으므로, 원인을 반환합니다.
             raise HTTPException(status_code=500, detail=f"Feature extraction failed: {e}")
 
+        # title/artist가 없으면 파일명을 title로 사용
+        song_title = title or os.path.splitext(file.filename)[0]
+        song_artist = artist or "Unknown"
+
+        # 5) FastAPI 연동 — 분석 결과를 SQLite에 저장
+        song_id = insert_song(
+            title=song_title,
+            artist=song_artist,
+            tempo=features["tempo_bpm"],
+            duration=features["duration_sec"],
+            mfcc=features["mfcc13_mean"],
+            chroma=features["chroma_mean"],
+            spectral_centroid=features["spectral_centroid_mean"],
+            zcr=features["zero_crossing_rate_mean"],
+        )
+
         return {
+            "song_id": song_id,
             "original_filename": file.filename,
             "saved_filename": safe_name,
             "saved_path": str(save_path),
             "bytes": len(content),
+            "title": song_title,
+            "artist": song_artist,
             "features": features,
         }
 
