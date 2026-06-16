@@ -1,0 +1,29 @@
+SQLite DB Snapshot (songs)
+
+db_path: C:\Users\selen\Projects\project-practice\backend\music.db
+generated_at_utc: 2026-06-16T13:21:49.506717+00:00
+
+tables: ['sqlite_sequence', 'songs']
+
+songs_columns:
+- id (INTEGER)
+- title (TEXT)
+- artist (TEXT)
+- tempo (REAL)
+- duration (REAL)
+- mfcc (TEXT; JSON array of 13 floats)
+- chroma (TEXT; JSON array of 12 floats)
+- spectral_centroid (REAL)
+- zcr (REAL)
+
+songs_count: 3
+
+songs:
+- id=1 title='Example Song A' artist='Example Artist' tempo=120.00 duration=30.00 spectral_centroid=2200.00 zcr=0.0500 mfcc_len=13 chroma_len=12
+- id=2 title='Example Song B' artist='Example Artist' tempo=128.00 duration=45.00 spectral_centroid=2600.00 zcr=0.0700 mfcc_len=13 chroma_len=12
+- id=3 title='Example Song C' artist='Another Artist' tempo=95.00 duration=60.00 spectral_centroid=1800.00 zcr=0.0300 mfcc_len=13 chroma_len=12
+
+Note:
+- DB 파일(`backend/music.db`) 자체는 `.gitignore`로 커밋되지 않습니다.
+- 이 파일은 현재 DB 상태를 “텍스트로 요약”한 스냅샷입니다.
+
